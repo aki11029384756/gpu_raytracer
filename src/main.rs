@@ -363,11 +363,7 @@ impl State {
         let compute_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Compute Shader"),
             source: wgpu::ShaderSource::Wgsl(
-                format!(
-                    "{}\n{}",
-                    include_str!("shaders/common_structs.wgsl"),
-                    include_str!("shaders/raytracer.wgsl"),
-                ).into()
+                include_str!("shaders/raytracer.wgsl").into()
             ),
         });
 
