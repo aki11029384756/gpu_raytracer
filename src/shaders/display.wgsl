@@ -27,8 +27,8 @@ fn fs_main(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     let color = textureLoad(render_texture, coords, 0);
 
 
-    let gamma = 2.2;
-    let corrected = pow(color.rgb, vec3<f32>(1.0 / gamma));
-
+    //let gamma = 2.2;
+    //let corrected = pow(color.rgb, vec3<f32>(1.0 / gamma));
+    let corrected = color.rgb;
     return vec4<f32>(corrected, 1.0);
 }

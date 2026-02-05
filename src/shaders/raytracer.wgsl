@@ -108,96 +108,59 @@ fn main(
 
     for (var rec_idx = 0u; rec_idx < recursions; rec_idx = rec_idx + 1) {
         // First get the hit triangle
-        var hit = HitInfo(
-            false,
-            1000.0,
-            vec3<f32>(0.0),
-            vec3<f32>(0.0),
-            0u
-        );
 
-        for (var i = 0u; i < scene_info.num_faces; i = i + 1) {
-            let face = faces[i];
-
-            let v0 = vertices[face.indices.x].position;
-            let v1 = vertices[face.indices.y].position;
-            let v2 = vertices[face.indices.z].position;
-            
-
-            let edge1 = v1 - v0;
-            let edge2 = v2 - v0;
-
-            let normal = face.normal0;
-
-            let dir_dot_norm = dot(dir, normal);
-            if dir_dot_norm > -0.01 { continue; }; // if we are parralell to or behind the face
-
-            let dist = dot(v0 - pos, normal) / dir_dot_norm;
-
-            if dist > hit.distance || dist < 0. { continue; };
-
-            let hit_pos = pos + dir * dist;
-
-            let h = cross(dir, edge2);
-            let a = dot(edge1, h);
-
-            if abs(a) < 0.001 { continue; }
-
-            let f = 1.0 / a;
-            let s = pos - v0;
-            let u = f * (dot(s, h));
-
-            if u < 0.0 || u > 1.0 { continue; }
-
-            let q = cross(s, edge1);
-            let v = f * (dot(dir, q));
-
-            if v < 0.0 || u + v > 1.0 { continue; }
+        let hit = cast_ray(pos, dir);
 
 
-            hit.distance = dist;
-            hit.hit = true;
-            hit.material_idx = face.material_idx;
-            hit.normal = normal;
-            hit.position = hit_pos;
-        }
 
-        if hit.hit {
-            let material = materials[hit.material_idx];
+        if !hit.hit { break; }
 
-            color += vec3<f32>(transmition * material.emission);
-            transmition = transmition * material.albedo;
 
-            if rec_idx == 0 && abs(hit.distance - camera.focal_distance) < 0.05 {
-                color += vec3<f32>(0.01);
-            }
+        let material = materials[hit.material_idx];
 
-            dir = reflect(dir, hit.normal);
+        color += vec3<f32>(transmition * material.emission);
+        transmition = transmition * material.albedo;
 
-            // apply some randomness for roughness
-            if material.roughness > 0. {
-                let roughness = material.roughness * material.roughness;
-
-                let rand_dir = vec3<f32>(
-                    hash(u32(abs(dir.x) * 172342) ^ rand_seed * 84321 + sample_count * 19) - 0.5,
-                    hash(u32(abs(dir.y) * 72345) ^ rand_seed * 91342 + sample_count * 3 ) - 0.5,
-                    hash(u32(abs(dir.z) * 9234521) ^ rand_seed * 382994 + sample_count * 9) - 0.5
-                );
-
-                var diffuse = normalize(rand_dir);
-                if dot(diffuse, hit.normal) < 0. {
-                    diffuse *= -1;
-                }
-
-                // Interpolate based on roughness
-                dir = normalize(mix(dir, diffuse, material.roughness));
-
-            }
-
-            pos = hit.position;
-        } else {
+        if (transmition.x < 0.01 && transmition.y < 0.01 && transmition.z < 0.01) {
             break;
         }
+
+
+        if rec_idx == 0 && abs(hit.distance - camera.focal_distance) < 0.05 {
+            color += vec3<f32>(0.01);
+        }
+
+        dir = reflect(dir, hit.normal);
+
+        // apply some randomness for roughness
+        if material.roughness > 0. {
+            let roughness = material.roughness * material.roughness;
+
+            let rand_dir = vec3<f32>(
+                hash(u32(abs(dir.x) * 172342) ^ rand_seed * 84321 + sample_count * 19) - 0.5,
+                hash(u32(abs(dir.y) * 72345) ^ rand_seed * 91342 + sample_count * 3 ) - 0.5,
+                hash(u32(abs(dir.z) * 9234521) ^ rand_seed * 382994 + sample_count * 9) - 0.5
+            );
+
+            var diffuse = normalize(rand_dir);
+            if dot(diffuse, hit.normal) < 0. {
+                diffuse *= -1;
+            }
+
+            // Interpolate based on roughness
+            dir = normalize(mix(dir, diffuse, material.roughness));
+
+        }
+
+        pos = hit.position;
+
+        let survival_prob = max(transmition.x, max(transmition.y, transmition.z));
+        if (hash(rand_seed * u32(pixel_i.x) * u32(pixel_i.y)) > survival_prob) {
+            break;  // Terminate with probability (1 - survival_prob)
+        } else {
+            transmition /= survival_prob;  // Boost to remain unbiased
+        }
+
     }
 
     let old_color = textureLoad(accumulation_input, pixel_i);
@@ -209,6 +172,76 @@ fn main(
     textureStore(render_texture, pixel_i, store_color / f32(sample_count+1));
 }
 
+
+
+fn cast_ray(pos: vec3<f32>, dir: vec3<f32>) -> HitInfo {
+    var hit = HitInfo(
+        false,
+        1000.0,
+        vec3<f32>(0.0),
+        vec3<f32>(0.0),
+        0u
+    );
+
+
+    for (var i = 0u; i < scene_info.num_faces; i = i + 1) {
+        let face = faces[i];
+
+        let v0 = vertices[face.indices.x].position;
+        let v1 = vertices[face.indices.y].position;
+        let v2 = vertices[face.indices.z].position;
+
+
+        let edge1 = v1 - v0;
+        let edge2 = v2 - v0;
+
+        var normal = face.normal0;
+
+        let dir_dot_norm = dot(dir, normal);
+        if dir_dot_norm >= 0. { continue; }; // if we are parralell to or behind the face
+
+        let dist = dot(v0 - pos, normal) / dir_dot_norm;
+
+        if dist > hit.distance || dist < 0. { continue; };
+
+        let hit_pos = pos + dir * dist;
+
+        let h = cross(dir, edge2);
+        let a = dot(edge1, h);
+
+        if abs(a) < 0.001 { continue; }
+
+        let f = 1.0 / a;
+        let s = pos - v0;
+        let u = f * (dot(s, h));
+
+        if u < 0.0 || u > 1.0 { continue; }
+
+        let q = cross(s, edge1);
+        let v = f * (dot(dir, q));
+
+        if v < 0.0 || u + v > 1.0 { continue; }
+
+        let w1 = u;
+        let w2 = v;
+        let w0 = 1.0 - w1 - w2;
+
+
+        normal = normalize(
+            face.normal0 * w0 +
+            face.normal1 * w1 +
+            face.normal2 * w2
+        );
+
+        hit.distance = dist;
+        hit.hit = true;
+        hit.material_idx = face.material_idx;
+        hit.normal = normal;
+        hit.position = hit_pos + normal * 0.001;
+    }
+
+    return hit;
+}
 
 
 
