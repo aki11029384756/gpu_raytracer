@@ -1,4 +1,4 @@
-use glam::{quat, Quat};
+use glam::{Quat};
 use glam::Vec3A as Vec3;
 
 
@@ -7,7 +7,6 @@ pub struct Face {
     pub indices: [usize; 3],
     pub normals: [Vec3; 3],
     pub material_idx: usize,
-    pub edges: [Vec3; 2],
 }
 
 impl Default for Face {
@@ -16,7 +15,6 @@ impl Default for Face {
             indices: [0; 3],
             normals: [Vec3::default(); 3],
             material_idx: 0,
-            edges: [Vec3::default(); 2],
         }
     }
 }
@@ -92,12 +90,6 @@ impl World {
                 *normal = baked.rotation * *normal;
                 *normal = normal.normalize();
             }
-        }
-
-        // Recompute edges
-        for face in &mut baked.faces {
-            face.edges[0] = baked.vertices[face.indices[1]] - baked.vertices[face.indices[0]];
-            face.edges[1] = baked.vertices[face.indices[2]] - baked.vertices[face.indices[0]];
         }
 
         baked

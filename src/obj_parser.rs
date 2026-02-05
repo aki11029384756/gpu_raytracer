@@ -97,7 +97,6 @@ pub fn load_glb(path: &str) -> Vec<Mesh> {
                             indices: [i0, i1, i2],
                             normals: [normals[i0], normals[i1], normals[i2]],
                             material_idx,
-                            edges: [Vec3::default(); 2],
                         });
                     }
                 } else {
@@ -109,7 +108,6 @@ pub fn load_glb(path: &str) -> Vec<Mesh> {
                             indices: [i, i + 1, i + 2],
                             normals: [normals[i], normals[i + 1], normals[i + 2]],
                             material_idx,
-                            edges: [Vec3::default(); 2],
                         });
                     }
                 }
