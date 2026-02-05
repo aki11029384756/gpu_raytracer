@@ -14,8 +14,7 @@ mod obj_parser;
 
 use my3d_lib::*;
 use glam::Vec3A;
-
-
+use wgpu::util::DeviceExt;
 
 // GPU-friendly structures (must be 16-byte aligned)
 #[repr(C)]
@@ -114,6 +113,8 @@ pub struct State {
     face_buffer: wgpu::Buffer,
     material_buffer: wgpu::Buffer,
     scene_info_buffer: wgpu::Buffer,
+    rand_seed_buffer: wgpu::Buffer,
+    sample_count_buffer: wgpu::Buffer,
 
     // Bind groups
     render_bind_group: wgpu::BindGroup,
@@ -270,6 +271,18 @@ impl State {
         let scene_info_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Scene Info Buffer"),
             contents: bytemuck::cast_slice(&[scene_info]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let rand_seed_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Rand Seed Buffer"),
+            contents: bytemuck::cast_slice(&[0]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let sample_count_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Sample count Buffer"),
+            contents: bytemuck::cast_slice(&[0]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -464,6 +477,28 @@ impl State {
                     },
                     count: None,
                 },
+                // Random seed
+                wgpu::BindGroupLayoutEntry {
+                    binding: 8,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // Sample count
+                wgpu::BindGroupLayoutEntry {
+                    binding: 9,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
         });
 
@@ -572,6 +607,8 @@ impl State {
             face_buffer,
             material_buffer,
             scene_info_buffer,
+            rand_seed_buffer,
+            sample_count_buffer,
             render_bind_group,
             camera_pos,
             yaw,
@@ -618,7 +655,7 @@ impl State {
 
             self.render_texture_view = self.render_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-            // Recreate BOTH accumulation textures
+            // Recreate both accumulation textures
             self.accumulation_texture_a = self.device.create_texture(&wgpu::TextureDescriptor {
                 label: Some("Accumulation Texture A"),
                 size: texture_size,
@@ -754,6 +791,8 @@ impl State {
             (&self.accumulation_texture_a_view, &self.accumulation_texture_b_view)
         };
 
+        self.queue.write_buffer(&self.rand_seed_buffer, 0, bytemuck::cast_slice(&[self.frame]));
+
         // Create bind group for this frame
         let compute_bind_group_layout = self.compute_pipeline.get_bind_group_layout(0);
         let compute_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -792,6 +831,14 @@ impl State {
                     binding: 7,
                     resource: wgpu::BindingResource::TextureView(output_view), // Write to this
                 },
+                wgpu::BindGroupEntry {
+                    binding: 8,
+                    resource: self.rand_seed_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 9,
+                    resource: self.sample_count_buffer.as_entire_binding(),
+                },
             ],
         });
 
@@ -818,7 +865,7 @@ impl State {
         }
 
         self.queue.submit(Some(encoder.finish()));
-        
+
         self.accumulation_swap ^= true;
 
         // Render to screen
@@ -885,6 +932,41 @@ impl State {
             },
             _ => {}
         }
+
+        self.reset_accumulation_textures();
+    }
+
+
+    fn reset_accumulation_textures(&mut self) {
+        self.sample_count = 0;
+
+        // Recreate both accumulation textures
+        self.accumulation_texture_a = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Accumulation Texture A"),
+            size: self.accumulation_texture_a.size(),
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba32Float,
+            usage: wgpu::TextureUsages::STORAGE_BINDING,
+            view_formats: &[],
+        });
+
+        self.accumulation_texture_a_view = self.accumulation_texture_a.create_view(&wgpu::TextureViewDescriptor::default());
+
+        self.accumulation_texture_b = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Accumulation Texture B"),
+            size: self.accumulation_texture_a.size(),
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba32Float,
+            usage: wgpu::TextureUsages::STORAGE_BINDING,
+            view_formats: &[],
+        });
+
+        self.accumulation_texture_b_view = self.accumulation_texture_b.create_view(&wgpu::TextureViewDescriptor::default());
+
     }
 }
 
@@ -970,7 +1052,8 @@ impl ApplicationHandler for App {
             if state.mouse_locked {
                 state.mouse_delta.0 += delta.0 as f32;
                 state.mouse_delta.1 += delta.1 as f32;
-                state.sample_count = 0;
+
+                state.reset_accumulation_textures();
             }
         }
     }
