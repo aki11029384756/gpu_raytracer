@@ -95,9 +95,13 @@ fn main(
     var screen_pos = vec2<f32>((pixel_f - vec2<f32>(resolution)/2.)/vec2<f32>(resolution));
     screen_pos.x *= aspect_ratio;
 
-    var pos = camera.position;
+    let offset = random_in_unit_disk(rand_seed * 84226 ^ u32(abs(screen_pos.x) * 17342 + abs(screen_pos.y) * 146842));
+    var disk_offset = (camera.right * offset.x + camera.up * offset.y) * camera.aperture_radius;
+    var pos = camera.position + disk_offset;
 
-    var dir = normalize(vec3<f32>(camera.forward + (camera.right * screen_pos.x) + (camera.up * screen_pos.y)));
+    var target_pos = camera.position + (camera.forward * camera.focal_distance) + ((camera.right * screen_pos.x) + (camera.up * screen_pos.y)) * camera.focal_distance;
+
+    var dir = normalize(target_pos - pos);
 
 
     let recursions: u32 = 4;
@@ -126,11 +130,11 @@ fn main(
             let normal = face.normal0;
 
             let dir_dot_norm = dot(dir, normal);
-            if dir_dot_norm > 0.01 { continue; }; // if we are parralell to or behind the face
+            if dir_dot_norm > -0.01 { continue; }; // if we are parralell to or behind the face
 
             let dist = dot(v0 - pos, normal) / dir_dot_norm;
 
-            if dist > hit.distance { continue; };
+            if dist > hit.distance || dist < 0. { continue; };
 
             let hit_pos = pos + dir * dist;
 
@@ -164,17 +168,33 @@ fn main(
             color += vec3<f32>(transmition * material.emission);
             transmition = transmition * material.albedo;
 
+
             dir = dir - 2.0 * dot(dir, hit.normal) * hit.normal;
 
             // apply some randomness for roughness
             if material.roughness > 0. {
-                var rand_dir = vec3<f32>(
+                let roughness = material.roughness * material.roughness;
+
+                var rand_dir = (vec3<f32>(
                     hash(u32(abs(dir.x) * 172342) ^ rand_seed * 84321 + sample_count * 19) - 0.5,
                     hash(u32(abs(dir.y) * 72345) ^ rand_seed * 91342 + sample_count * 3 ) - 0.5,
                     hash(u32(abs(dir.z) * 9234521) ^ rand_seed * 382994 + sample_count * 9) - 0.5
-                ) * material.roughness * 2;
+                )) * 2.;
 
-                dir = normalize(dir + rand_dir);
+
+                if dot(rand_dir, hit.normal) < 0. {
+                    rand_dir *= -1;
+                }
+
+                // Calculate both directions
+                let reflected = dir - 2.0 * dot(dir, hit.normal) * hit.normal;
+                let diffuse = normalize(hit.normal + rand_dir);
+
+                // Interpolate based on roughness
+                dir = normalize(mix(reflected, diffuse, material.roughness));
+
+            } else {
+                dir = dir - hit.normal * dot(hit.normal, dir) * 2.;
             }
 
             pos = hit.position;
@@ -199,4 +219,14 @@ fn hash(seed: u32) -> f32 {
     var state = seed * 747796405u + 2891336453u;
     var word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
     return f32((word >> 22u) ^ word) / 4294967295.0;
+}
+
+fn random_in_unit_disk(seed: u32) -> vec3<f32> {
+    let r1 = hash(seed);
+    let r2 = hash(seed ^ 0x9E3779B9);
+
+    let r = sqrt(r1);
+    let theta = r2 * radians(360);
+
+    return vec3<f32>(r * cos(theta), r * sin(theta), 0.0);
 }

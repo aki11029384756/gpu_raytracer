@@ -28,7 +28,7 @@ fn fs_main(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
 
 
     let gamma = 2.2;
-    var corrected = pow(color.rgb, vec3<f32>(1.0 / gamma));
+    let corrected = pow(color.rgb, vec3<f32>(1.0 / gamma));
 
     return vec4<f32>(corrected, 1.0);
 }

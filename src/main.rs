@@ -132,7 +132,7 @@ pub struct State {
     // Input state
     keys_down: std::collections::HashSet<KeyCode>,
     mouse_delta: (f32, f32),
-    mouse_locked: bool,
+    input_locked: bool,
 
     // Frame counter
     frame: u32,
@@ -586,6 +586,7 @@ impl State {
             cache: None,
         });
 
+
         Ok(Self {
             surface,
             device,
@@ -620,7 +621,7 @@ impl State {
             aperture_radius: 0.05,
             keys_down: std::collections::HashSet::new(),
             mouse_delta: (0.0, 0.0),
-            mouse_locked: true,
+            input_locked: false,
             frame: 0,
             sample_count: 0,
             num_faces,
@@ -726,37 +727,39 @@ impl State {
         self.right = self.forward.cross(world_up).normalize();
         self.up = self.right.cross(self.forward).normalize();
 
-        let mut moved = false;
+        if !self.input_locked {
+            let mut moved = false;
 
-        // Movement
-        let amount = speed * dt;
-        if self.keys_down.contains(&KeyCode::KeyW) {
-            self.camera_pos += self.forward * amount;
-            moved = true;
-        }
-        if self.keys_down.contains(&KeyCode::KeyS) {
-            self.camera_pos -= self.forward * amount;
-            moved = true;
-        }
-        if self.keys_down.contains(&KeyCode::KeyD) {
-            self.camera_pos += self.right * amount;
-            moved = true;
-        }
-        if self.keys_down.contains(&KeyCode::KeyA) {
-            self.camera_pos -= self.right * amount;
-            moved = true;
-        }
-        if self.keys_down.contains(&KeyCode::Space) {
-            self.camera_pos -= self.up * amount;
-            moved = true;
-        }
-        if self.keys_down.contains(&KeyCode::ShiftLeft) {
-            self.camera_pos += self.up * amount;
-            moved = true;
-        }
+            // Movement
+            let amount = speed * dt;
+            if self.keys_down.contains(&KeyCode::KeyW) {
+                self.camera_pos += self.forward * amount;
+                moved = true;
+            }
+            if self.keys_down.contains(&KeyCode::KeyS) {
+                self.camera_pos -= self.forward * amount;
+                moved = true;
+            }
+            if self.keys_down.contains(&KeyCode::KeyD) {
+                self.camera_pos += self.right * amount;
+                moved = true;
+            }
+            if self.keys_down.contains(&KeyCode::KeyA) {
+                self.camera_pos -= self.right * amount;
+                moved = true;
+            }
+            if self.keys_down.contains(&KeyCode::Space) {
+                self.camera_pos -= self.up * amount;
+                moved = true;
+            }
+            if self.keys_down.contains(&KeyCode::ShiftLeft) {
+                self.camera_pos += self.up * amount;
+                moved = true;
+            }
 
-        if moved {
-            self.sample_count = 0;
+            if moved {
+                self.reset_accumulation_textures()
+            }
         }
 
         // Update camera buffer
@@ -792,6 +795,7 @@ impl State {
         };
 
         self.queue.write_buffer(&self.rand_seed_buffer, 0, bytemuck::cast_slice(&[self.frame]));
+        self.queue.write_buffer(&self.sample_count_buffer, 0, bytemuck::cast_slice(&[self.sample_count]));
 
         // Create bind group for this frame
         let compute_bind_group_layout = self.compute_pipeline.get_bind_group_layout(0);
@@ -920,20 +924,26 @@ impl State {
         match (code, is_pressed) {
             (KeyCode::Escape, true) => event_loop.exit(),
             (KeyCode::KeyL, true) => {
-                self.mouse_locked = !self.mouse_locked;
+                self.input_locked = !self.input_locked;
             },
             (KeyCode::ArrowUp, true) => {
                 self.focal_distance += 0.02;
-                self.sample_count = 0;
+                self.reset_accumulation_textures();
             },
             (KeyCode::ArrowDown, true) => {
                 self.focal_distance -= 0.02;
-                self.sample_count = 0;
+                self.reset_accumulation_textures();
+            },
+            (KeyCode::ArrowLeft, true) => {
+                self.aperture_radius += 0.02;
+            },
+            (KeyCode::ArrowRight, true) => {
+                self.aperture_radius -= 0.02;
             },
             _ => {}
         }
 
-        self.reset_accumulation_textures();
+
     }
 
 
@@ -1032,7 +1042,9 @@ impl ApplicationHandler for App {
                     ..
                 },
                 ..
-            } => state.handle_key(event_loop, code, key_state.is_pressed()),
+            } => {
+                state.handle_key(event_loop, code, key_state.is_pressed())
+            },
             _ => {}
         }
     }
@@ -1049,9 +1061,9 @@ impl ApplicationHandler for App {
         };
 
         if let DeviceEvent::MouseMotion { delta } = event {
-            if state.mouse_locked {
-                state.mouse_delta.0 += delta.0 as f32;
-                state.mouse_delta.1 += delta.1 as f32;
+            if !state.input_locked {
+                state.mouse_delta.0 -= delta.0 as f32;
+                state.mouse_delta.1 -= delta.1 as f32;
 
                 state.reset_accumulation_textures();
             }
@@ -1078,7 +1090,7 @@ fn generate_map() -> World {
     let mut world = World { meshes: vec![], baked_meshes: vec![] };
 
     // Add Cornell box
-    world.meshes.extend(obj_parser::load_glb("src/models/cornell_box.glb"));
+    world.meshes.extend(obj_parser::load_glb("src/models/low_poly_house.glb"));
 
     world.bake_meshes();
     world
