@@ -818,6 +818,8 @@ impl State {
         }
 
         self.queue.submit(Some(encoder.finish()));
+        
+        self.accumulation_swap ^= true;
 
         // Render to screen
         let output = self.surface.get_current_texture()?;

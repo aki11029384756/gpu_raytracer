@@ -70,7 +70,7 @@ struct HitInfo {
 @group(0) @binding(6) var accumulation_input: texture_storage_2d<rgba32float, read>;
 @group(0) @binding(7) var accumulation_output: texture_storage_2d<rgba32float, write>;
 
-const resolution = vec2<f32>(1920.0, 1080.0);
+const resolution = vec2<i32>(1920, 1080);
 
 
 
@@ -93,7 +93,7 @@ fn main(
     var dir = camera.forward;
     let pos = camera.position;
 
-    let recursions = 1;
+    let recursions: u32 = 1;
 
     for (var rec_idx = 0u; rec_idx < recursions; rec_idx = rec_idx + 1) {
         // First get the hit triangle
@@ -112,8 +112,8 @@ fn main(
             let v1 = vertices[face.indices.y].position;
             let v2 = vertices[face.indices.z].position;
             
-            // Compute edges on the fly
-            let edge1 = v1 - v0;  // ← Calculated here
+
+            let edge1 = v1 - v0;
             let edge2 = v2 - v0;
 
             let normal = face.normal0;
@@ -125,8 +125,8 @@ fn main(
     }
 
 
-    textureStore(accumulation_output, pixel_i, vec4<f32>(color, 1.0));
+    //textureStore(accumulation_output, pixel_i, vec4<f32>(color, 1.0));
 
     // Lastly we write the accumulated to render_texture
-    textureStore(render_texture, pixel_i, vec4<f32>(0.0, screen_uv, 1.0));
+    textureStore(render_texture, pixel_i, vec4<f32>(0.0, 1.0, 1.0, 1.0));
 }

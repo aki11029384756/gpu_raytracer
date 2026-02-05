@@ -26,13 +26,9 @@ fn fs_main(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     let coords = vec2<i32>(position.xy);
     let color = textureLoad(render_texture, coords, 0);
 
-    // This is important! Monitors expect gamma-corrected colors
+
     let gamma = 2.2;
     var corrected = pow(color.rgb, vec3<f32>(1.0 / gamma));
-
-    let uv = position.xy/resolution;
-    corrected.g = uv.x;
-    corrected.b = uv.y;
 
     return vec4<f32>(corrected, 1.0);
 }
