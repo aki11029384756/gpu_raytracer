@@ -130,7 +130,7 @@ fn main(
             let normal = face.normal0;
 
             let dir_dot_norm = dot(dir, normal);
-            //if dir_dot_norm > -0.01 { continue; }; // if we are parralell to or behind the face
+            if dir_dot_norm > -0.01 { continue; }; // if we are parralell to or behind the face
 
             let dist = dot(v0 - pos, normal) / dir_dot_norm;
 

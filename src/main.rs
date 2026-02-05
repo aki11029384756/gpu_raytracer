@@ -1097,7 +1097,7 @@ fn generate_map() -> World {
     let mut world = World { meshes: vec![], baked_meshes: vec![] };
 
     // Add Cornell box
-    world.meshes.extend(obj_parser::load_glb("src/models/low_poly_house.glb"));
+    world.meshes.extend(obj_parser::load_glb("src/models/cornell_box.glb"));
 
     world.bake_meshes();
     world
