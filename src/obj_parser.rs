@@ -117,6 +117,7 @@ pub fn load_glb(path: &str) -> Vec<Mesh> {
                 meshes.push(mesh);
             }
         }
+        
     }
 
     meshes

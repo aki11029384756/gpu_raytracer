@@ -293,10 +293,10 @@ impl State {
 
         let mut forward = Vec3A::default();
         forward.x = yaw.sin() * pitch.cos();
-        forward.y = yaw.cos() * pitch.cos();
-        forward.z = pitch.sin();
+        forward.y = pitch.sin();
+        forward.z = yaw.cos() * pitch.cos();
 
-        let world_up = Vec3A::new(0.0, 0.0, 1.0);
+        let world_up = Vec3A::new(0.0, 1.0, 0.0);
         let right = forward.cross(world_up).normalize();
         let up = right.cross(forward).normalize();
 
@@ -711,8 +711,8 @@ impl State {
         let mouse_sensitivity = 0.002;
 
         // Update camera rotation
-        self.yaw += self.mouse_delta.0 * mouse_sensitivity;
-        self.pitch += self.mouse_delta.1 * mouse_sensitivity;
+        self.yaw -= self.mouse_delta.0 * mouse_sensitivity;
+        self.pitch -= self.mouse_delta.1 * mouse_sensitivity;
         self.mouse_delta = (0.0, 0.0);
 
         // Clamp pitch
@@ -720,12 +720,12 @@ impl State {
 
         // Update forward vector
         self.forward.x = self.yaw.sin() * self.pitch.cos();
-        self.forward.y = self.yaw.cos() * self.pitch.cos();
-        self.forward.z = self.pitch.sin();
+        self.forward.y = self.pitch.sin();
+        self.forward.z = self.yaw.cos() * self.pitch.cos();
 
-        let world_up = Vec3A::new(0.0, 0.0, 1.0);
+        let world_up = Vec3A::new(0.0, 1.0, 0.0);
         self.right = self.forward.cross(world_up).normalize();
-        self.up = self.right.cross(self.forward).normalize();
+        self.up = self.forward.cross(self.right).normalize();
 
         if !self.input_locked {
             let mut moved = false;
@@ -920,6 +920,8 @@ impl State {
         } else {
             self.keys_down.remove(&code);
         }
+        
+        let mut update: bool = false;
 
         match (code, is_pressed) {
             (KeyCode::Escape, true) => event_loop.exit(),
@@ -927,23 +929,29 @@ impl State {
                 self.input_locked = !self.input_locked;
             },
             (KeyCode::ArrowUp, true) => {
-                self.focal_distance += 0.02;
-                self.reset_accumulation_textures();
+                self.focal_distance += 0.06;
+                update = true;
             },
             (KeyCode::ArrowDown, true) => {
-                self.focal_distance -= 0.02;
-                self.reset_accumulation_textures();
+                self.focal_distance -= 0.06;
+                update = true;
             },
             (KeyCode::ArrowLeft, true) => {
-                self.aperture_radius += 0.02;
+                self.aperture_radius -= 0.002;
+                update = true;
             },
             (KeyCode::ArrowRight, true) => {
-                self.aperture_radius -= 0.02;
+                self.aperture_radius += 0.002;
+                update = true;
             },
             _ => {}
         }
+        
+        if update {
+            self.reset_accumulation_textures();
+        }
 
-
+        self.window.set_title(&format!("GPU Raytracer - Samples: {}, focal distance: {}, aperture radius: {}, ", self.sample_count, self.focal_distance, self.aperture_radius));
     }
 
 

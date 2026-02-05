@@ -97,7 +97,7 @@ fn main(
 
     let offset = random_in_unit_disk(rand_seed * 84226 ^ u32(abs(screen_pos.x) * 17342 + abs(screen_pos.y) * 146842));
     var disk_offset = (camera.right * offset.x + camera.up * offset.y) * camera.aperture_radius;
-    var pos = camera.position;// + disk_offset;
+    var pos = camera.position + disk_offset;
 
     var target_pos = camera.position + (camera.forward * camera.focal_distance) + ((camera.right * screen_pos.x) + (camera.up * screen_pos.y)) * camera.focal_distance;
 
@@ -168,33 +168,30 @@ fn main(
             color += vec3<f32>(transmition * material.emission);
             transmition = transmition * material.albedo;
 
+            if rec_idx == 0 && abs(hit.distance - camera.focal_distance) < 0.05 {
+                color += vec3<f32>(0.01);
+            }
 
-            dir = dir - 2.0 * dot(dir, hit.normal) * hit.normal;
+            dir = reflect(dir, hit.normal);
 
             // apply some randomness for roughness
             if material.roughness > 0. {
                 let roughness = material.roughness * material.roughness;
 
-                var rand_dir = (vec3<f32>(
+                let rand_dir = vec3<f32>(
                     hash(u32(abs(dir.x) * 172342) ^ rand_seed * 84321 + sample_count * 19) - 0.5,
                     hash(u32(abs(dir.y) * 72345) ^ rand_seed * 91342 + sample_count * 3 ) - 0.5,
                     hash(u32(abs(dir.z) * 9234521) ^ rand_seed * 382994 + sample_count * 9) - 0.5
-                )) * 2.;
+                );
 
-
-                if dot(rand_dir, hit.normal) < 0. {
-                    rand_dir *= -1;
+                var diffuse = normalize(rand_dir);
+                if dot(diffuse, hit.normal) < 0. {
+                    diffuse *= -1;
                 }
 
-                // Calculate both directions
-                let reflected = dir - 2.0 * dot(dir, hit.normal) * hit.normal;
-                let diffuse = normalize(hit.normal + rand_dir);
-
                 // Interpolate based on roughness
-                dir = normalize(mix(reflected, diffuse, material.roughness));
+                dir = normalize(mix(dir, diffuse, material.roughness));
 
-            } else {
-                dir = dir - hit.normal * dot(hit.normal, dir) * 2.;
             }
 
             pos = hit.position;
