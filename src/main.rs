@@ -711,8 +711,8 @@ impl State {
         let mouse_sensitivity = 0.002;
 
         // Update camera rotation
-        self.yaw -= self.mouse_delta.0 * mouse_sensitivity;
-        self.pitch -= self.mouse_delta.1 * mouse_sensitivity;
+        self.yaw += self.mouse_delta.0 * mouse_sensitivity;
+        self.pitch += self.mouse_delta.1 * mouse_sensitivity;
         self.mouse_delta = (0.0, 0.0);
 
         // Clamp pitch
@@ -1069,8 +1069,8 @@ impl ApplicationHandler for App {
 
         if let DeviceEvent::MouseMotion { delta } = event {
             if !state.input_locked {
-                state.mouse_delta.0 -= delta.0 as f32;
-                state.mouse_delta.1 -= delta.1 as f32;
+                state.mouse_delta.0 += delta.0 as f32;
+                state.mouse_delta.1 += delta.1 as f32;
 
                 state.reset_accumulation_textures();
             }
@@ -1097,7 +1097,7 @@ fn generate_map() -> World {
     let mut world = World { meshes: vec![], baked_meshes: vec![] };
 
     // Add Cornell box
-    world.meshes.extend(obj_parser::load_glb("src/models/cornell_box.glb"));
+    world.meshes.extend(obj_parser::load_glb("src/models/low_poly_house.glb"));
 
     world.bake_meshes();
     world
