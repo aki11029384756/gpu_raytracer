@@ -78,12 +78,17 @@ const resolution = vec2<f32>(1920.0, 1080.0);
 fn main(
     @builtin(global_invocation_id) gid: vec3<u32>,
 ) {
-    let pixel = vec2<i32>(gid.xy);
+    let pixel_i = vec2<i32>(gid.xy);
+    let pixel_f = vec2<i32>(gid.xy);
+
+    if (gid.x >= u32(resolution.x) || gid.y >= u32(resolution.y)) {
+        return;
+    }
 
     let color = vec3<f32>(0.0, 0.0, 0.0);
     let transmition = vec3<f32>(1.0, 1.0, 1.0); // When we hit an object we reduce transmition by its albedo
 
-    let screen_uv = vec2<f32>((pixel - resolution/2)/resolution);
+    let screen_uv = vec2<f32>((pixel_f - resolution/2)/resolution);
 
     var dir = camera.forward;
     let pos = camera.position;
@@ -111,17 +116,17 @@ fn main(
             let edge1 = v1 - v0;  // ← Calculated here
             let edge2 = v2 - v0;
 
-            let normal = vertices[face.indices.x].normal;
+            let normal = face.normal0;
 
-            let dist = 
+            let dist = 0.0;
 
 
         }
     }
 
 
-    textureStore(accumulation_output, pixel, color);
+    textureStore(accumulation_output, pixel_i, vec4<f32>(color, 1.0));
 
     // Lastly we write the accumulated to render_texture
-    textureStore(render_texture, pixel, vec4<screen_uv, 0.0, 1.0>);
+    textureStore(render_texture, pixel_i, vec4<f32>(0.0, screen_uv, 1.0));
 }
