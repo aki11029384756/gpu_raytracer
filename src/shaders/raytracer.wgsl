@@ -67,8 +67,8 @@ struct HitInfo {
 @group(0) @binding(3) var<storage, read> faces: array<Face>;
 @group(0) @binding(4) var<storage, read> materials: array<Material>;
 @group(0) @binding(5) var render_texture: texture_storage_2d<rgba32float, write>;
-@group(0) @binding(6) var accumulation_input: texture_storage_2d<rgba32float, read>;
-@group(0) @binding(7) var accumulation_output: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(6) var accumulation_input: texture_storage_2d<rgba16float, read>;
+@group(0) @binding(7) var accumulation_output: texture_storage_2d<rgba16float, write>;
 @group(0) @binding(8) var<uniform> rand_seed: u32;
 @group(0) @binding(9) var<uniform> sample_count: u32;
 
@@ -195,7 +195,7 @@ fn cast_ray(pos: vec3<f32>, dir: vec3<f32>) -> HitInfo {
         let edge1 = v1 - v0;
         let edge2 = v2 - v0;
 
-        var normal = face.normal0;
+        let normal = cross(edge1, edge2);
 
         let dir_dot_norm = dot(dir, normal);
         if dir_dot_norm >= 0. { continue; }; // if we are parralell to or behind the face
@@ -227,7 +227,7 @@ fn cast_ray(pos: vec3<f32>, dir: vec3<f32>) -> HitInfo {
         let w0 = 1.0 - w1 - w2;
 
 
-        normal = normalize(
+        let hit_normal = normalize(
             face.normal0 * w0 +
             face.normal1 * w1 +
             face.normal2 * w2
@@ -236,8 +236,8 @@ fn cast_ray(pos: vec3<f32>, dir: vec3<f32>) -> HitInfo {
         hit.distance = dist;
         hit.hit = true;
         hit.material_idx = face.material_idx;
-        hit.normal = normal;
-        hit.position = hit_pos + normal * 0.001;
+        hit.normal = hit_normal;
+        hit.position = hit_pos + hit_normal * 0.001;
     }
 
     return hit;
