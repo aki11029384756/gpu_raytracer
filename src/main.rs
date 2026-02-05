@@ -14,7 +14,10 @@ mod obj_parser;
 
 use my3d_lib::*;
 use glam::Vec3A;
+use wgpu::{RenderPipeline, StoreOp};
+use wgpu::hal::gles::PipelineLayout;
 use wgpu::util::DeviceExt;
+use wgpu::wgc::command::RenderPassColorAttachment;
 
 // GPU-friendly structures (must be 16-byte aligned)
 #[repr(C)]
@@ -93,6 +96,7 @@ pub struct State {
     // Raytracing pipeline
     compute_pipeline: wgpu::ComputePipeline,
     render_pipeline: wgpu::RenderPipeline,
+    wireframe_pipeline: wgpu::RenderPipeline,
 
     // Textures
     render_texture: wgpu::Texture,
@@ -105,6 +109,9 @@ pub struct State {
 
     // Track which is current
     accumulation_swap: bool,
+
+
+    world: World,
 
 
     // Buffers
@@ -128,6 +135,8 @@ pub struct State {
     up: Vec3A,
     focal_distance: f32,
     aperture_radius: f32,
+
+    preview_mode: bool,
 
     // Input state
     keys_down: std::collections::HashSet<KeyCode>,
@@ -385,6 +394,11 @@ impl State {
             source: wgpu::ShaderSource::Wgsl(include_str!("shaders/display.wgsl").into()),
         });
 
+        let wireframe_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Wireframe Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/wireframe.wgsl").into()),
+        });
+
         // Create bind group layouts
         let compute_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Compute Bind Group Layout"),
@@ -546,6 +560,8 @@ impl State {
             ],
         });
 
+
+
         let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
             bind_group_layouts: &[&render_bind_group_layout],
@@ -587,6 +603,74 @@ impl State {
         });
 
 
+        let wireframe_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Wireframe Bind Group Layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+        });
+
+        let wireframe_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+           label:  Some("Wireframe Bind Group"),
+            layout: &wireframe_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: camera_buffer.as_entire_binding(),
+                },
+            ]
+        });
+
+        let wireframe_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Wireframe Pipeline Layout"),
+            bind_group_layouts: &[&wireframe_bind_group_layout],
+            immediate_size: 0,
+        });
+
+        let wireframe_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Wireframe Pipeline"),
+            layout: Some(&wireframe_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &wireframe_shader,
+                entry_point: Some("vs_main"),
+                buffers: &[],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &wireframe_shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: surface_format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::LineList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+
+
         Ok(Self {
             surface,
             device,
@@ -596,6 +680,7 @@ impl State {
             window,
             compute_pipeline,
             render_pipeline,
+            wireframe_pipeline,
             render_texture,
             render_texture_view,
             accumulation_texture_a,
@@ -603,6 +688,7 @@ impl State {
             accumulation_texture_b,
             accumulation_texture_b_view,
             accumulation_swap: false,
+            world,
             camera_buffer,
             vertex_buffer,
             face_buffer,
@@ -617,6 +703,7 @@ impl State {
             forward,
             right,
             up,
+
             focal_distance: 4.0,
             aperture_radius: 0.05,
             keys_down: std::collections::HashSet::new(),
@@ -626,6 +713,7 @@ impl State {
             sample_count: 0,
             num_faces,
             num_materials,
+            preview_mode: true,
         })
     }
 
@@ -787,6 +875,90 @@ impl State {
             return Ok(());
         }
 
+        if self.preview_mode {
+            // Simple rasterized preview rendering
+            self.render_preview()?;
+
+        } else {
+            // Normal raytrace rendering
+
+            self.render_raytrace()?;
+        }
+
+        self.window.request_redraw();
+
+        Ok(())
+    }
+
+
+    fn render_preview(&mut self) -> Result<(), wgpu::SurfaceError> {
+
+        let mut wireframe_vertices = Vec::new();
+
+        for mesh in &self.world.baked_meshes {
+            for face in &mesh.faces {
+                let v0 = GpuVertex { position: [mesh.vertices[face.indices[0]].x, mesh.vertices[face.indices[0]].y, mesh.vertices[face.indices[0]].z], _padding: 0.0 };
+                let v1 = GpuVertex { position: [mesh.vertices[face.indices[1]].x, mesh.vertices[face.indices[1]].y, mesh.vertices[face.indices[1]].z], _padding: 0.0 };
+                let v2 = GpuVertex { position: [mesh.vertices[face.indices[2]].x, mesh.vertices[face.indices[2]].y, mesh.vertices[face.indices[2]].z], _padding: 0.0 };
+
+                // triangle edges as lines
+                wireframe_vertices.push(v0); wireframe_vertices.push(v1);
+                wireframe_vertices.push(v1); wireframe_vertices.push(v2);
+                wireframe_vertices.push(v2); wireframe_vertices.push(v0);
+            }
+        }
+
+
+        let wireframe_vertex_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Wireframe Vertex Buffer"),
+            contents: bytemuck::cast_slice(&wireframe_vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
+
+
+        // Run rasterizer shader
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Wireframe Encoder"),
+        });
+
+        let output = self.surface.get_current_texture()?;
+        {
+            let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Wireframe Pass"),
+                timestamp_writes: None,
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK), // or any background color
+                        store: StoreOp::Store,
+                    },
+                    depth_slice: None,
+                })],
+                depth_stencil_attachment: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+
+            // Bind all the data to group 0
+            render_pass.set_pipeline(&self.wireframe_pipeline);
+            render_pass.set_vertex_buffer(0, wireframe_vertex_buffer.slice(..));
+            render_pass.draw(0..wireframe_vertices.len() as u32, 0..1);
+
+        }
+
+        self.queue.submit(iter::once(encoder.finish()));
+
+        output.present();
+
+        Ok(())
+    }
+
+
+    fn render_raytrace(&mut self) -> Result<(), wgpu::SurfaceError> {
         // Determine which texture is input and which is output
         let (input_view, output_view) = if self.accumulation_swap {
             (&self.accumulation_texture_b_view, &self.accumulation_texture_a_view)
@@ -909,8 +1081,6 @@ impl State {
         self.frame += 1;
         self.sample_count += 1;
 
-        self.window.request_redraw();
-
         Ok(())
     }
 
@@ -920,7 +1090,7 @@ impl State {
         } else {
             self.keys_down.remove(&code);
         }
-        
+
         let mut update: bool = false;
 
         match (code, is_pressed) {
@@ -944,9 +1114,12 @@ impl State {
                 self.aperture_radius += 0.002;
                 update = true;
             },
+            (KeyCode::KeyP, true) => {
+                self.preview_mode = !self.preview_mode;
+            }
             _ => {}
         }
-        
+
         if update {
             self.reset_accumulation_textures();
         }
@@ -1105,7 +1278,7 @@ fn generate_map() -> World {
     let mut world = World { meshes: vec![], baked_meshes: vec![] };
 
     // Add Cornell box
-    world.meshes.extend(obj_parser::load_glb("src/models/low_poly_house.glb"));
+    world.meshes.extend(obj_parser::load_glb("src/models/low_poly_room.glb"));
 
     world.bake_meshes();
     world

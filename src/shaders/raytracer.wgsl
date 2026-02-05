@@ -125,11 +125,6 @@ fn main(
             break;
         }
 
-
-        if rec_idx == 0 && abs(hit.distance - camera.focal_distance) < 0.05 {
-            color += vec3<f32>(0.01);
-        }
-
         dir = reflect(dir, hit.normal);
 
         // apply some randomness for roughness
