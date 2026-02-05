@@ -70,6 +70,9 @@ struct HitInfo {
 @group(0) @binding(6) var accumulation_input: texture_storage_2d<rgba32float, read>;
 @group(0) @binding(7) var accumulation_output: texture_storage_2d<rgba32float, write>;
 
+const resolution = vec2<f32>(1920.0, 1080.0);
+
+
 
 @compute @workgroup_size(8, 8, 1)
 fn main(
@@ -80,8 +83,10 @@ fn main(
     let color = vec3<f32>(0.0, 0.0, 0.0);
     let transmition = vec3<f32>(1.0, 1.0, 1.0); // When we hit an object we reduce transmition by its albedo
 
-    let dir = camera.forward;
-    let pos = camera.position
+    let screen_uv = vec2<f32>((pixel - resolution/2)/resolution);
+
+    var dir = camera.forward;
+    let pos = camera.position;
 
     let recursions = 1;
 
@@ -118,5 +123,5 @@ fn main(
     textureStore(accumulation_output, pixel, color);
 
     // Lastly we write the accumulated to render_texture
-    textureStore(render_texture, pixel, color);
+    textureStore(render_texture, pixel, vec4<screen_uv, 0.0, 1.0>);
 }
