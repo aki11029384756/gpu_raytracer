@@ -152,7 +152,7 @@ impl State {
             ..Default::default()
         });
 
-        let surface = instance.create_surface(window.clone()).unwrap();
+        let surface = instance.create_surface(window.clone())?;
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -999,8 +999,14 @@ impl ApplicationHandler for App {
         let window_attributes = Window::default_attributes()
             .with_title("GPU Raytracer");
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
+        
+        let mut state = Some(pollster::block_on(State::new(window)).unwrap());
 
-        self.state = Some(pollster::block_on(State::new(window)).unwrap());
+        if let Some(state) = &mut state {
+            state.reset_accumulation_textures();
+        }
+        
+        self.state = state;
     }
 
     fn window_event(
