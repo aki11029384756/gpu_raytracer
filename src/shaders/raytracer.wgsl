@@ -51,6 +51,14 @@ struct Face {
 };
 
 
+struct HitInfo {
+    hit: bool,
+    distance: f32,
+    position: vec3<f32>,
+    normal: vec3<f32>,
+    material_idx: u32,
+}
+
 
 
 @group(0) @binding(0) var<uniform> camera: Camera;
@@ -69,7 +77,46 @@ fn main(
 ) {
     let pixel = vec2<i32>(gid.xy);
 
-    let color = vec4<f32>(1.0, 0.0, 0.0, 1.0); // red
+    let color = vec3<f32>(0.0, 0.0, 0.0);
+    let transmition = vec3<f32>(1.0, 1.0, 1.0); // When we hit an object we reduce transmition by its albedo
+
+    let dir = camera.forward;
+    let pos = camera.position
+
+    let recursions = 1;
+
+    for (var rec_idx = 0u; rec_idx < recursions; rec_idx = rec_idx + 1) {
+        // First get the hit triangle
+        var hit = HitInfo(
+            false,
+            1000.0,
+            vec3<f32>(0.0),
+            vec3<f32>(0.0),
+            0u
+        );
+
+        for (var i = 0u; i < scene_info.num_faces; i = i + 1) {
+            let face = faces[i];
+
+            let v0 = vertices[face.indices.x].position;
+            let v1 = vertices[face.indices.y].position;
+            let v2 = vertices[face.indices.z].position;
+            
+            // Compute edges on the fly
+            let edge1 = v1 - v0;  // ← Calculated here
+            let edge2 = v2 - v0;
+
+            let normal = vertices[face.indices.x].normal;
+
+            let dist = 
+
+
+        }
+    }
+
 
     textureStore(accumulation_output, pixel, color);
+
+    // Lastly we write the accumulated to render_texture
+    textureStore(render_texture, pixel, color);
 }

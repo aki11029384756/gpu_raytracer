@@ -817,9 +817,6 @@ impl State {
             compute_pass.dispatch_workgroups(dispatch_x, dispatch_y, 1);
         }
 
-        // Swap for next frame
-        self.accumulation_swap = !self.accumulation_swap;
-
         self.queue.submit(Some(encoder.finish()));
 
         // Render to screen
