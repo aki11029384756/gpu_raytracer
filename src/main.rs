@@ -999,13 +999,14 @@ impl ApplicationHandler for App {
         let window_attributes = Window::default_attributes()
             .with_title("GPU Raytracer");
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
-        
-        let mut state = Some(pollster::block_on(State::new(window)).unwrap());
 
-        if let Some(state) = &mut state {
-            state.reset_accumulation_textures();
-        }
+        let mut state = Some(pollster::block_on(State::new(window)).unwrap());
         
+        if let Some(state) = &mut state {
+            let size = state.window.inner_size();
+            state.resize(size.width, size.height); // This configures the surface!
+        }
+
         self.state = state;
     }
 

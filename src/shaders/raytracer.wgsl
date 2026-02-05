@@ -97,7 +97,7 @@ fn main(
 
     let offset = random_in_unit_disk(rand_seed * 84226 ^ u32(abs(screen_pos.x) * 17342 + abs(screen_pos.y) * 146842));
     var disk_offset = (camera.right * offset.x + camera.up * offset.y) * camera.aperture_radius;
-    var pos = camera.position + disk_offset;
+    var pos = camera.position;// + disk_offset;
 
     var target_pos = camera.position + (camera.forward * camera.focal_distance) + ((camera.right * screen_pos.x) + (camera.up * screen_pos.y)) * camera.focal_distance;
 
@@ -130,7 +130,7 @@ fn main(
             let normal = face.normal0;
 
             let dir_dot_norm = dot(dir, normal);
-            if dir_dot_norm > -0.01 { continue; }; // if we are parralell to or behind the face
+            //if dir_dot_norm > -0.01 { continue; }; // if we are parralell to or behind the face
 
             let dist = dot(v0 - pos, normal) / dir_dot_norm;
 
