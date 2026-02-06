@@ -72,14 +72,14 @@ struct HitInfo {
 @group(0) @binding(8) var<uniform> rand_seed: u32;
 @group(0) @binding(9) var<uniform> sample_count: u32;
 
-const resolution = vec2<i32>(1920, 1080);
-
 
 
 @compute @workgroup_size(8, 8, 1)
 fn main(
     @builtin(global_invocation_id) gid: vec3<u32>,
 ) {
+    let resolution = vec2<f32>(1920.0, 1080.0);
+
     let pixel_i = vec2<i32>(gid.xy);
     let pixel_f = vec2<f32>(gid.xy);
 

@@ -32,7 +32,7 @@ fn vs_main(in: VertexInput) -> VertexOutput {
     let relative_pos = in.position - camera.position;
 
     // Project onto camera plane
-    let x = dot(relative_pos, camera.right)/(1920./1080.);
+    let x = dot(relative_pos, camera.right)/(16.0/9.0);
     let y = -dot(relative_pos, camera.up);
     let z = dot(relative_pos, camera.forward);
 

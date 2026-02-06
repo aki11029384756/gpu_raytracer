@@ -31,7 +31,7 @@ pub fn load_glb(path: &str) -> Vec<Mesh> {
 
         let roughness = pbr.roughness_factor() as f32;
 
-        global_materials.push(Material { albedo, emission, roughness });
+        global_materials.push(Material { albedo, emission, roughness, metallic: pbr.metallic_factor() });
     }
     if global_materials.is_empty() {
         global_materials.push(Material::default());

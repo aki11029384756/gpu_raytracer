@@ -15,7 +15,7 @@ mod obj_parser;
 use my3d_lib::*;
 use glam::Vec3A;
 use wgpu::{RenderPipeline, StoreOp};
-use wgpu::hal::gles::PipelineLayout;
+
 use wgpu::util::DeviceExt;
 use wgpu::wgc::command::RenderPassColorAttachment;
 
