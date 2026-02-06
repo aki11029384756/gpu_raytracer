@@ -12,7 +12,7 @@ struct Camera {
     forward: vec3<f32>,
     _pad2: f32,
     right: vec3<f32>,
-    _pad3: vec3<f32>,
+    _pad3: f32,
     up: vec3<f32>,
     _pad4: f32,
     focal_distance: f32,
@@ -27,8 +27,28 @@ struct Camera {
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
-    //let view_proj = camera.projection * camera.view;
-    //out.clip_position = view_proj * vec4(in.position, 1.0);
+
+    // Transform to camera space
+    let relative_pos = in.position - camera.position;
+
+    // Project onto camera plane
+    let x = dot(relative_pos, camera.right)/(1920./1080.);
+    let y = -dot(relative_pos, camera.up);
+    let z = dot(relative_pos, camera.forward);
+
+    // Perspective divide
+    out.clip_position = vec4<f32>(x, y, z, z);
+
+    if abs(z-camera.focal_distance) < 0.05 {
+        out.clip_position.z -= 0.1;
+        out.clip_position.w -= 0.1;
+    }
 
     return out;
+}
+
+
+@fragment
+fn fs_main() -> @location(0) vec4<f32> {
+    return vec4<f32>(1.0, 1.0, 1.0, 1.0); // white
 }

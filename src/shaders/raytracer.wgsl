@@ -193,7 +193,7 @@ fn cast_ray(pos: vec3<f32>, dir: vec3<f32>) -> HitInfo {
         let normal = cross(edge1, edge2);
 
         let dir_dot_norm = dot(dir, normal);
-        if dir_dot_norm >= 0. { continue; }; // if we are parralell to or behind the face
+        //if dir_dot_norm >= 0. { continue; }; // if we are parralell to or behind the face
 
         let dist = dot(v0 - pos, normal) / dir_dot_norm;
 

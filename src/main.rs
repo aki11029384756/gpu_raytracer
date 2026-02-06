@@ -174,7 +174,7 @@ impl State {
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: None,
-                required_features: wgpu::Features::empty(),
+                required_features: wgpu::Features::POLYGON_MODE_LINE,
                 experimental_features: wgpu::ExperimentalFeatures::disabled(),
                 required_limits: wgpu::Limits::default(),
                 memory_hints: Default::default(),
@@ -608,7 +608,7 @@ impl State {
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    visibility: wgpu::ShaderStages::VERTEX,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -642,7 +642,17 @@ impl State {
             vertex: wgpu::VertexState {
                 module: &wireframe_shader,
                 entry_point: Some("vs_main"),
-                buffers: &[],
+                buffers: &[wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<GpuVertex>() as wgpu::BufferAddress,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &[
+                        wgpu::VertexAttribute {
+                            offset: 0,
+                            shader_location: 0,
+                            format: wgpu::VertexFormat::Float32x3,
+                        },
+                    ],
+                }],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -660,7 +670,7 @@ impl State {
                 strip_index_format: None,
                 front_face: wgpu::FrontFace::Ccw,
                 cull_mode: None,
-                polygon_mode: wgpu::PolygonMode::Fill,
+                polygon_mode: wgpu::PolygonMode::Line,
                 unclipped_depth: false,
                 conservative: false,
             },
@@ -922,6 +932,20 @@ impl State {
             label: Some("Wireframe Encoder"),
         });
 
+
+        let wireframe_bind_group_layout = self.wireframe_pipeline.get_bind_group_layout(0);
+        let wireframe_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Wireframe Bind Group"),
+            layout: &wireframe_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.camera_buffer.as_entire_binding(),
+                },
+                ]
+        });
+
+
         let output = self.surface.get_current_texture()?;
         {
             let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -945,6 +969,7 @@ impl State {
 
             // Bind all the data to group 0
             render_pass.set_pipeline(&self.wireframe_pipeline);
+            render_pass.set_bind_group(0, &wireframe_bind_group, &[]);
             render_pass.set_vertex_buffer(0, wireframe_vertex_buffer.slice(..));
             render_pass.draw(0..wireframe_vertices.len() as u32, 0..1);
 
