@@ -30,6 +30,9 @@ pub struct Material {
 
     /// How much reflected rays are scattered
     pub roughness: f32,
+    
+    /// How metallic the material is
+    pub metallic: f32,
 }
 
 impl Default for Material {
@@ -38,6 +41,7 @@ impl Default for Material {
             albedo: Vec3::new(1.0, 1.0, 1.0),
             emission: Vec3::default(),
             roughness: 1.0,
+            metallic: 0.0,
         }
     }
 }
