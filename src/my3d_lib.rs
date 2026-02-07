@@ -23,7 +23,7 @@ impl Default for Face {
 #[derive(Copy, Clone)]
 pub struct Material {
     /// A materials ability to reflect light
-    pub albedo: Vec3,
+    pub base_color: Vec3,
 
     /// The emitted light from the material
     pub emission: Vec3,
@@ -38,7 +38,7 @@ pub struct Material {
 impl Default for Material {
     fn default() -> Material {
         Material {
-            albedo: Vec3::new(1.0, 1.0, 1.0),
+            base_color: Vec3::new(1.0, 1.0, 1.0),
             emission: Vec3::default(),
             roughness: 1.0,
             metallic: 0.0,

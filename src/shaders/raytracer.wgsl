@@ -29,11 +29,10 @@ struct Vertex {
 };
 
 struct Material {
-    albedo: vec3<f32>,
+    base_color: vec3<f32>,
     roughness: f32,
-
     emission: vec3<f32>,
-    _pad: f32,
+    metallic: f32,
 };
 
 struct Face {
@@ -116,35 +115,47 @@ fn main(
         if !hit.hit { break; }
 
 
-        let material = materials[hit.material_idx];
+        let material: Material = materials[hit.material_idx];
 
         color += vec3<f32>(transmition * material.emission);
-        transmition = transmition * material.albedo;
+        transmition = transmition * material.base_color;
 
         if (transmition.x < 0.01 && transmition.y < 0.01 && transmition.z < 0.01) {
             break;
         }
 
-        dir = reflect(dir, hit.normal);
 
-        // apply some randomness for roughness
-        if material.roughness > 0. {
+        // Calculate like reflection angle and stuff
+        let F0 = mix(vec3(0.04), material.base_color, material.metallic);
+        let cos_theta = max(dot(-dir, hit.normal), 0.);
+        let F = F0 + (vec3(1.0) - F0) * pow(1.0 - cos_theta, 5.0);
+
+
+        let F_avg = (F.r + F.g + F.b) / 3.0;
+
+        let specular_probability = mix(F_avg, 1.0, material.metallic);
+
+
+        var rand_dir = normalize(vec3<f32>(
+            hash(u32(abs(dir.x) * 172342) ^ rand_seed * 84321 + rec_idx * 19) - 0.5,
+            hash(u32(abs(dir.y) * 72345) ^ rand_seed * 91342 + rec_idx * 3 ) - 0.5,
+            hash(u32(abs(dir.z) * 9234521) ^ rand_seed * 382994 + rec_idx * 9) - 0.5
+        ));
+
+        let rand = hash(u32(hash(u32(rand_dir.x * 282245)) * hash(u32(rand_dir.x * 843273)) * hash(u32(rand_dir.x * 14167)) * 1723.));
+
+
+        if (rand < specular_probability) {
+            // Specular reflection
             let roughness = material.roughness * material.roughness;
 
-            let rand_dir = vec3<f32>(
-                hash(u32(abs(dir.x) * 172342) ^ rand_seed * 84321 + sample_count * 19) - 0.5,
-                hash(u32(abs(dir.y) * 72345) ^ rand_seed * 91342 + sample_count * 3 ) - 0.5,
-                hash(u32(abs(dir.z) * 9234521) ^ rand_seed * 382994 + sample_count * 9) - 0.5
-            );
-
-            var diffuse = normalize(rand_dir);
-            if dot(diffuse, hit.normal) < 0. {
-                diffuse *= -1;
+            dir = normalize(reflect(dir, hit.normal) + rand_dir * material.roughness);
+        } else {
+            if dot(rand_dir, hit.normal) < 0. {
+                rand_dir = rand_dir * -1.;
             }
 
-            // Interpolate based on roughness
-            dir = normalize(mix(dir, diffuse, material.roughness));
-
+            dir = rand_dir;
         }
 
         pos = hit.position;
@@ -193,7 +204,7 @@ fn cast_ray(pos: vec3<f32>, dir: vec3<f32>) -> HitInfo {
         let normal = cross(edge1, edge2);
 
         let dir_dot_norm = dot(dir, normal);
-        //if dir_dot_norm >= 0. { continue; }; // if we are parralell to or behind the face
+        //if dir_dot_norm > 0. { continue; }; // if we are parralell to the face
 
         let dist = dot(v0 - pos, normal) / dir_dot_norm;
 

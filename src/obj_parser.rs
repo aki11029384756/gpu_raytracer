@@ -14,7 +14,7 @@ pub fn load_glb(path: &str) -> Vec<Mesh> {
     for mat in gltf.materials() {
         let pbr = mat.pbr_metallic_roughness();
         let base = pbr.base_color_factor();
-        let albedo = Vec3::new(base[0] as f32, base[1] as f32, base[2] as f32);
+        let base_color = Vec3::new(base[0] as f32, base[1] as f32, base[2] as f32);
         
         
         let emissive = mat.emissive_factor();
@@ -24,14 +24,14 @@ pub fn load_glb(path: &str) -> Vec<Mesh> {
         }
 
         println!("Material: {:?}", mat.name());
-        println!("  Albedo: {:?}", albedo);
+        println!("  Base color: {:?}", base_color);
         println!("  Emission: {:?}", emission);
         println!("  Roughness: {}", pbr.roughness_factor());
 
 
         let roughness = pbr.roughness_factor() as f32;
 
-        global_materials.push(Material { albedo, emission, roughness, metallic: pbr.metallic_factor() });
+        global_materials.push(Material { base_color, emission, roughness, metallic: pbr.metallic_factor() });
     }
     if global_materials.is_empty() {
         global_materials.push(Material::default());

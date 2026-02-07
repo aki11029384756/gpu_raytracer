@@ -40,19 +40,19 @@ struct GpuCamera {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct GpuMaterial {
-    albedo: [f32; 3],
+    base_color: [f32; 3],
     roughness: f32,
     emission: [f32; 3],
-    _padding: f32,
+    metallic: f32,
 }
 
 impl From<Material> for GpuMaterial {
     fn from(mat: Material) -> Self {
         Self {
-            albedo: [mat.albedo.x, mat.albedo.y, mat.albedo.z],
+            base_color: [mat.base_color.x, mat.base_color.y, mat.base_color.z],
             roughness: mat.roughness,
             emission: [mat.emission.x, mat.emission.y, mat.emission.z],
-            _padding: 0.0,
+            metallic: mat.metallic,
         }
     }
 }
@@ -1303,7 +1303,7 @@ fn generate_map() -> World {
     let mut world = World { meshes: vec![], baked_meshes: vec![] };
 
     // Add Cornell box
-    world.meshes.extend(obj_parser::load_glb("src/models/low_poly_room.glb"));
+    world.meshes.extend(obj_parser::load_glb("src/models/cornell_box.glb"));
 
     world.bake_meshes();
     world

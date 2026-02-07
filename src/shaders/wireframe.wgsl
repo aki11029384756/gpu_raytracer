@@ -40,7 +40,6 @@ fn vs_main(in: VertexInput) -> VertexOutput {
     out.clip_position = vec4<f32>(x, y, z, z);
 
     if abs(z-camera.focal_distance) < 0.05 {
-        out.clip_position.z -= 0.1;
         out.clip_position.w -= 0.1;
     }
 
